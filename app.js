@@ -540,7 +540,13 @@
     }
 
     var pageEl = document.querySelector(".page");
-    pipWindow = await documentPictureInPicture.requestWindow({ width: 420, height: 780 });
+    try {
+      pipWindow = await documentPictureInPicture.requestWindow({ width: 420, height: 780 });
+    } catch (err) {
+      pipWindow = null;
+      alert("Couldn't open the floating window:\n" + err.name + " — " + err.message);
+      return;
+    }
 
     Array.prototype.forEach.call(document.styleSheets, function (sheet) {
       try {
