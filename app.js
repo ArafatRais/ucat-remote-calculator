@@ -8,6 +8,7 @@
     firstOperand: null,
     operator: null,
     waitingForSecondOperand: false,
+    operandPending: false, // true = an operator was pressed but nothing has been entered as its operand yet
     memory: 0,
   };
 
@@ -45,6 +46,7 @@
     state.firstOperand = null;
     state.operator = null;
     state.waitingForSecondOperand = false;
+    state.operandPending = false;
   }
 
   function inputDigit(digit) {
@@ -55,6 +57,7 @@
     } else {
       state.displayValue = state.displayValue === "0" ? digit : state.displayValue + digit;
     }
+    state.operandPending = false;
   }
 
   function inputDecimal() {
@@ -62,11 +65,13 @@
     if (state.waitingForSecondOperand) {
       state.displayValue = "0.";
       state.waitingForSecondOperand = false;
+      state.operandPending = false;
       return;
     }
     if (!state.displayValue.includes(".")) {
       state.displayValue += ".";
     }
+    state.operandPending = false;
   }
 
   function handleOperator(nextOperator) {
@@ -88,6 +93,7 @@
 
     state.waitingForSecondOperand = true;
     state.operator = nextOperator;
+    state.operandPending = true;
   }
 
   function handleEquals() {
@@ -103,7 +109,10 @@
       return;
     }
 
-    var second = state.waitingForSecondOperand ? state.firstOperand : parseFloat(state.displayValue);
+    // operandPending means the operator was just pressed and nothing has been
+    // entered since (no digit, no memory recall, no sqrt) — so "=" doubles the
+    // first operand (e.g. "5 + =" -> 10) instead of using the stale display.
+    var second = state.operandPending ? state.firstOperand : parseFloat(state.displayValue);
     var result = calculate(state.firstOperand, second, state.operator);
 
     logHistory(formatNumber(state.firstOperand) + " " + OP_SYMBOL[state.operator] + " " + formatNumber(second) + " = " + formatNumber(result));
@@ -125,6 +134,7 @@
       state.firstOperand = null;
       state.operator = null;
       state.waitingForSecondOperand = false;
+      state.operandPending = false;
       lastOperatorForRepeat = null;
       lastOperandForRepeat = null;
     }
@@ -135,6 +145,7 @@
     state.displayValue = state.displayValue.startsWith("-")
       ? state.displayValue.slice(1)
       : "-" + state.displayValue;
+    state.operandPending = false;
   }
 
   function sqrtOp() {
@@ -143,6 +154,7 @@
     var result = Math.sqrt(v);
     state.displayValue = formatNumber(result);
     state.waitingForSecondOperand = true;
+    state.operandPending = false;
     logHistory("√" + formatNumber(v) + " = " + formatNumber(result));
   }
 
@@ -153,17 +165,20 @@
         var addResult = state.firstOperand + state.firstOperand * (v / 100);
         logHistory(formatNumber(state.firstOperand) + " + " + formatNumber(v) + "% = " + formatNumber(addResult));
         state.displayValue = formatNumber(addResult);
-        state.firstOperand = null; state.operator = null; state.waitingForSecondOperand = true;
+        state.firstOperand = null; state.operator = null; state.waitingForSecondOperand = true; state.operandPending = false;
       } else if (state.operator === "subtract") {
         var subResult = state.firstOperand - state.firstOperand * (v / 100);
         logHistory(formatNumber(state.firstOperand) + " − " + formatNumber(v) + "% = " + formatNumber(subResult));
         state.displayValue = formatNumber(subResult);
-        state.firstOperand = null; state.operator = null; state.waitingForSecondOperand = true;
+        state.firstOperand = null; state.operator = null; state.waitingForSecondOperand = true; state.operandPending = false;
       } else {
         state.displayValue = formatNumber(v / 100);
+        state.waitingForSecondOperand = true;
+        state.operandPending = false;
       }
     } else {
       state.displayValue = formatNumber(v / 100);
+      state.waitingForSecondOperand = true;
     }
   }
 
@@ -178,6 +193,7 @@
     } else {
       state.displayValue = formatNumber(state.memory);
       state.waitingForSecondOperand = true;
+      state.operandPending = false;
       memoryJustRecalled = true;
     }
   }
@@ -255,6 +271,19 @@
   }
 
   function perform(actionOrDigit, isDigit, isRemote) {
+    // The tutee never applies their own presses directly — they'd be mutating
+    // state independently of the host, and if both people type close together
+    // the two sides can end up applying the same presses in a different order
+    // (host sees "9, +", tutee's own copy already saw "+, 9"), which is exactly
+    // what caused digits to randomly append to the wrong number. Instead the
+    // tutee sends a request and only applies it once the host echoes it back,
+    // so the host's processing order is the single source of truth for both.
+    if (!isRemote && !amHost && conn && conn.open) {
+      flashKey(keySelectorFor(actionOrDigit, isDigit));
+      conn.send({ type: "request", value: actionOrDigit, isDigit: isDigit });
+      return;
+    }
+
     if (actionOrDigit !== "mrc") memoryJustRecalled = false;
 
     if (isDigit) {
@@ -264,12 +293,9 @@
       if (fn) fn();
     }
     render();
+    flashKey(keySelectorFor(actionOrDigit, isDigit));
 
-    if (isRemote) {
-      flashKey(keySelectorFor(actionOrDigit, isDigit));
-    } else {
-      broadcastAction(actionOrDigit, isDigit);
-    }
+    if (!isRemote) broadcastAction(actionOrDigit, isDigit);
   }
 
   document.querySelectorAll(".key").forEach(function (btn) {
@@ -383,6 +409,12 @@
       if (payload.type === "mode") {
         hostOnly = !!payload.hostOnly;
         applyLock();
+        return;
+      }
+      if (payload.type === "request") {
+        // Only the host actually applies+broadcasts, so this becomes the one
+        // authoritative order of operations both sides converge on.
+        if (amHost) perform(payload.value, payload.isDigit, false);
         return;
       }
       perform(payload.value, payload.isDigit, true);

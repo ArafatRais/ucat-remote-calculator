@@ -279,7 +279,6 @@ body {
   text-align: center;
   padding: 10px 14px;
   border-radius: 10px;
-  margin-bottom: 12px;
 }
 
 /* ---------- History ---------- */
@@ -458,7 +457,6 @@ body {
 }
 
 .key:disabled {
-  opacity: 0.5;
   cursor: not-allowed;
 }
 .key:disabled:active { transform: none; }
