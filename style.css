@@ -453,7 +453,8 @@ body {
 .key-equals { font-size: 22px; }
 
 .key.flash-remote {
-  box-shadow: inset 0 0 0 999px rgba(255, 205, 40, 0.8), 0 2px 0 rgba(0,0,0,0.25);
+  background-color: #ffd128 !important;
+  color: #1c2230 !important;
 }
 
 .key:disabled {

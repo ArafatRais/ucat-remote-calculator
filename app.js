@@ -182,8 +182,14 @@
     }
   }
 
-  function memoryAdd() { state.memory += parseFloat(state.displayValue) || 0; }
-  function memorySubtract() { state.memory -= parseFloat(state.displayValue) || 0; }
+  function memoryAdd() {
+    state.memory += parseFloat(state.displayValue) || 0;
+    state.waitingForSecondOperand = true;
+  }
+  function memorySubtract() {
+    state.memory -= parseFloat(state.displayValue) || 0;
+    state.waitingForSecondOperand = true;
+  }
 
   function memoryRecallClear() {
     if (memoryJustRecalled) {
@@ -271,19 +277,6 @@
   }
 
   function perform(actionOrDigit, isDigit, isRemote) {
-    // The tutee never applies their own presses directly — they'd be mutating
-    // state independently of the host, and if both people type close together
-    // the two sides can end up applying the same presses in a different order
-    // (host sees "9, +", tutee's own copy already saw "+, 9"), which is exactly
-    // what caused digits to randomly append to the wrong number. Instead the
-    // tutee sends a request and only applies it once the host echoes it back,
-    // so the host's processing order is the single source of truth for both.
-    if (!isRemote && !amHost && conn && conn.open) {
-      flashKey(keySelectorFor(actionOrDigit, isDigit));
-      conn.send({ type: "request", value: actionOrDigit, isDigit: isDigit });
-      return;
-    }
-
     if (actionOrDigit !== "mrc") memoryJustRecalled = false;
 
     if (isDigit) {
@@ -296,6 +289,15 @@
     flashKey(keySelectorFor(actionOrDigit, isDigit));
 
     if (!isRemote) broadcastAction(actionOrDigit, isDigit);
+
+    // Safety net: if both sides happen to press different keys in the same
+    // instant, they can briefly disagree (each applies its own key before the
+    // other's arrives). Rather than let that drift persist, the host
+    // re-broadcasts its authoritative state at natural checkpoints (=, ON/C)
+    // so both sides realign within one keystroke instead of compounding.
+    if (amHost && !isDigit && (actionOrDigit === "equals" || actionOrDigit === "clear") && conn && conn.open) {
+      conn.send({ type: "sync", state: state, hostOnly: hostOnly, history: historyEntries });
+    }
   }
 
   document.querySelectorAll(".key").forEach(function (btn) {
@@ -409,12 +411,6 @@
       if (payload.type === "mode") {
         hostOnly = !!payload.hostOnly;
         applyLock();
-        return;
-      }
-      if (payload.type === "request") {
-        // Only the host actually applies+broadcasts, so this becomes the one
-        // authoritative order of operations both sides converge on.
-        if (amHost) perform(payload.value, payload.isDigit, false);
         return;
       }
       perform(payload.value, payload.isDigit, true);
