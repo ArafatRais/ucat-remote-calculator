@@ -312,7 +312,7 @@
     });
   });
 
-  document.addEventListener("keydown", function (e) {
+  function handleGlobalKeydown(e) {
     if (e.target.tagName === "INPUT") return;
     if (hostOnly && !amHost) return;
     if (e.key >= "0" && e.key <= "9") { perform(e.key, true); return; }
@@ -328,7 +328,9 @@
     if (e.key.toLowerCase() === "c") { perform("mrc", false); return; }
     if (e.key.toLowerCase() === "p") { perform("mplus", false); return; }
     if (e.key.toLowerCase() === "m") { perform("mminus", false); return; }
-  });
+  }
+
+  document.addEventListener("keydown", handleGlobalKeydown);
 
   render();
   renderHistory();
@@ -518,4 +520,54 @@
     codeInput.value = roomParam.toUpperCase();
     joinSession(roomParam);
   }
+
+  // ---------- Floating window (Document Picture-in-Picture) ----------
+  // Lets the Chrome extension pop this page's whole UI into an always-on-top
+  // window that stays visible over other apps. Exposed on window so a script
+  // injected by the extension's background worker can call it; harmless for
+  // normal browser visitors since nothing calls it unless triggered.
+
+  var pipWindow = null;
+
+  window.__ucatTogglePip = async function () {
+    if (pipWindow) {
+      pipWindow.close();
+      return;
+    }
+    if (!("documentPictureInPicture" in window)) {
+      alert("Floating mode needs a recent version of Chrome (Document Picture-in-Picture support).");
+      return;
+    }
+
+    var pageEl = document.querySelector(".page");
+    pipWindow = await documentPictureInPicture.requestWindow({ width: 420, height: 780 });
+
+    Array.prototype.forEach.call(document.styleSheets, function (sheet) {
+      try {
+        var cssText = Array.prototype.map.call(sheet.cssRules, function (rule) { return rule.cssText; }).join("\n");
+        var style = document.createElement("style");
+        style.textContent = cssText;
+        pipWindow.document.head.appendChild(style);
+      } catch (e) {
+        if (sheet.href) {
+          var link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.href = sheet.href;
+          pipWindow.document.head.appendChild(link);
+        }
+      }
+    });
+
+    pipWindow.document.body.style.margin = "0";
+    pipWindow.document.body.style.background = "var(--bg, #eef1f6)";
+    pipWindow.document.body.appendChild(pageEl);
+    // Keyboard shortcuts are bound to the original document; re-bind them to
+    // the pip window's document too since that's what has focus while typing.
+    pipWindow.document.addEventListener("keydown", handleGlobalKeydown);
+
+    pipWindow.addEventListener("pagehide", function () {
+      document.body.appendChild(pageEl);
+      pipWindow = null;
+    });
+  };
 })();
