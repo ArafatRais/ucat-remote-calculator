@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UCAT Remote Calculator</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="page">
+
+  <div class="topbar">
+    <div class="brand">UCAT Remote Calculator</div>
+    <div id="statusPill" class="status-pill status-offline">
+      <span class="dot"></span>
+      <span id="statusText">Not connected</span>
+    </div>
+  </div>
+
+  <div id="hostControls" class="host-controls hidden">
+    <span class="host-controls-label">Tutee can also use the calculator</span>
+    <label class="switch">
+      <input type="checkbox" id="allowTuteeToggle" checked>
+      <span class="switch-track"><span class="switch-thumb"></span></span>
+    </label>
+  </div>
+
+  <div id="sessionPanel" class="session-panel">
+    <div class="session-card">
+      <h1>Practice together, in sync</h1>
+      <p class="subtitle">Start a session and share the link or code with your tutee — you'll both see every key press live.</p>
+
+      <div class="session-actions">
+        <button id="startBtn" class="btn btn-primary">Start new session</button>
+      </div>
+
+      <div class="divider"><span>or join one</span></div>
+
+      <div class="join-row">
+        <input id="codeInput" class="code-input" placeholder="Enter session code" maxlength="6" autocomplete="off" autocapitalize="characters">
+        <button id="joinBtn" class="btn btn-secondary">Join</button>
+      </div>
+      <p id="sessionError" class="error-text hidden"></p>
+    </div>
+
+    <div id="waitingCard" class="session-card hidden">
+      <h1>Waiting for your tutee&hellip;</h1>
+      <p class="subtitle">Share this link or code. The calculator is already usable while you wait.</p>
+
+      <div class="code-display">
+        <span id="roomCodeText">------</span>
+      </div>
+
+      <div class="link-row">
+        <input id="linkOutput" class="link-input" readonly>
+        <button id="copyLinkBtn" class="btn btn-secondary">Copy link</button>
+      </div>
+      <button id="dismissWaitingBtn" class="btn btn-text">Use calculator now &rarr;</button>
+    </div>
+  </div>
+
+  <div class="calc-shell">
+    <div id="lockedBanner" class="locked-banner hidden">Your tutor has control — you're in view-only mode</div>
+    <div class="calc-body">
+
+      <div class="calc-screen">
+        <div class="screen-glass">
+          <span id="memIndicator" class="mem-indicator hidden">M</span>
+          <span id="displayMain" class="display-main">0.</span>
+        </div>
+      </div>
+
+      <div class="calc-brand">
+        <span class="brand-name">TEXAS INSTRUMENTS</span>
+        <span class="brand-model">TI-108</span>
+      </div>
+
+      <div class="keypad">
+        <button class="key key-red" style="grid-area:sign" data-action="sign">+/&minus;</button>
+        <button class="key key-red" style="grid-area:sqrt" data-action="sqrt">&radic;&#8254;</button>
+        <button class="key key-red" style="grid-area:pct" data-action="percent">%</button>
+        <button class="key key-red key-op" style="grid-area:div" data-action="divide">&divide;</button>
+
+        <button class="key key-red" style="grid-area:mrc" data-action="mrc">MRC</button>
+        <button class="key key-red" style="grid-area:mminus" data-action="mminus">M&minus;</button>
+        <button class="key key-red" style="grid-area:mplus" data-action="mplus">M+</button>
+        <button class="key key-red key-op" style="grid-area:mul" data-action="multiply">&times;</button>
+
+        <button class="key key-white" style="grid-area:n7" data-digit="7">7</button>
+        <button class="key key-white" style="grid-area:n8" data-digit="8">8</button>
+        <button class="key key-white" style="grid-area:n9" data-digit="9">9</button>
+        <button class="key key-red key-op" style="grid-area:sub" data-action="subtract">&minus;</button>
+
+        <button class="key key-white" style="grid-area:n4" data-digit="4">4</button>
+        <button class="key key-white" style="grid-area:n5" data-digit="5">5</button>
+        <button class="key key-white" style="grid-area:n6" data-digit="6">6</button>
+        <button class="key key-red key-op" style="grid-area:add" data-action="add">+</button>
+
+        <button class="key key-white" style="grid-area:n1" data-digit="1">1</button>
+        <button class="key key-white" style="grid-area:n2" data-digit="2">2</button>
+        <button class="key key-white" style="grid-area:n3" data-digit="3">3</button>
+        <button class="key key-red key-op key-equals" style="grid-area:eq" data-action="equals">=</button>
+
+        <button class="key key-red" style="grid-area:onc" data-action="clear">ON/C</button>
+        <button class="key key-white" style="grid-area:n0" data-digit="0">0</button>
+        <button class="key key-white" style="grid-area:dot" data-action="decimal">.</button>
+      </div>
+
+      <div class="calc-logo" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <details id="historyDetails" class="history-details">
+    <summary>Calculation history</summary>
+    <ol id="historyList" class="history-list"></ol>
+  </details>
+
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
