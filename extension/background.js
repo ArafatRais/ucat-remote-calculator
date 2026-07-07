@@ -17,26 +17,21 @@ chrome.action.onClicked.addListener(async () => {
   const existingTab = await findExistingTab();
 
   if (!existingTab) {
-    // First run (or the tab was closed): open and load it in the background.
-    // This click's user-activation gets used up here, not on requestWindow(),
-    // since Document Picture-in-Picture needs to be called right at the
-    // moment of a click — the *next* icon click (once this tab has loaded)
-    // is the one that actually pops the floating window.
-    const tab = await chrome.tabs.create({ url: CALC_URL, active: false, pinned: true });
+    // First run (or the tab was closed): open and load it. Document PiP
+    // needs to be requested right at the moment of a click, so this click
+    // is used up just getting the tab ready — the *next* icon click (once
+    // it's loaded) is the one that actually pops the floating window.
+    const tab = await chrome.tabs.create({ url: CALC_URL, active: true });
     await chrome.storage.session.set({ calcTabId: tab.id });
-
-    chrome.action.setBadgeBackgroundColor({ color: "#2f6fed" });
-    chrome.action.setBadgeText({ text: "..." });
-
-    const onUpdated = (updatedTabId, info) => {
-      if (updatedTabId === tab.id && info.status === "complete") {
-        chrome.action.setBadgeText({ text: "" });
-        chrome.tabs.onUpdated.removeListener(onUpdated);
-      }
-    };
-    chrome.tabs.onUpdated.addListener(onUpdated);
     return;
   }
+
+  // Document Picture-in-Picture requires the requesting tab to actually be
+  // the focused one — a background/inactive tab never gets the activation
+  // needed to open it, no matter how many times you click. Bring it to the
+  // front first, then trigger the toggle in that same click.
+  await chrome.tabs.update(existingTab.id, { active: true });
+  await chrome.windows.update(existingTab.windowId, { focused: true });
 
   try {
     await chrome.scripting.executeScript({
