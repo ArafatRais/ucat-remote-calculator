@@ -13,36 +13,23 @@ async function findExistingTab() {
   return null;
 }
 
+// The extension only opens/focuses the calculator tab. Popping it into a
+// floating window is done with the "Pop out" button on the page itself —
+// a real, direct click there is a genuine user gesture, which is what
+// Document Picture-in-Picture actually requires. Trying to trigger that
+// via a script injected from the extension (in response to the toolbar
+// icon click) didn't reliably count as a valid gesture in testing.
 chrome.action.onClicked.addListener(async () => {
   const existingTab = await findExistingTab();
 
-  if (!existingTab) {
-    // First run (or the tab was closed): open and load it. Document PiP
-    // needs to be requested right at the moment of a click, so this click
-    // is used up just getting the tab ready — the *next* icon click (once
-    // it's loaded) is the one that actually pops the floating window.
-    const tab = await chrome.tabs.create({ url: CALC_URL, active: true });
-    await chrome.storage.session.set({ calcTabId: tab.id });
+  if (existingTab) {
+    await chrome.tabs.update(existingTab.id, { active: true });
+    await chrome.windows.update(existingTab.windowId, { focused: true });
     return;
   }
 
-  // Document Picture-in-Picture requires the requesting tab to actually be
-  // the focused one — a background/inactive tab never gets the activation
-  // needed to open it, no matter how many times you click. Bring it to the
-  // front first, then trigger the toggle in that same click.
-  await chrome.tabs.update(existingTab.id, { active: true });
-  await chrome.windows.update(existingTab.windowId, { focused: true });
-
-  try {
-    await chrome.scripting.executeScript({
-      target: { tabId: existingTab.id },
-      func: () => {
-        if (window.__ucatTogglePip) window.__ucatTogglePip();
-      },
-    });
-  } catch (err) {
-    console.error("UCAT floating calculator: failed to toggle", err);
-  }
+  const tab = await chrome.tabs.create({ url: CALC_URL, active: true });
+  await chrome.storage.session.set({ calcTabId: tab.id });
 });
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {

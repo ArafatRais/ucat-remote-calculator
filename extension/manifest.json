@@ -4,10 +4,9 @@
   "version": "1.0.0",
   "description": "Pop the UCAT remote calculator into an always-on-top floating window you can drag anywhere on screen.",
   "action": {
-    "default_title": "Toggle floating UCAT calculator"
+    "default_title": "Open the UCAT calculator (use its \"Pop out\" button to float it)"
   },
-  "permissions": ["scripting", "tabs", "storage"],
-  "host_permissions": ["https://arafatrais.github.io/*"],
+  "permissions": ["tabs", "storage"],
   "background": {
     "service_worker": "background.js"
   },

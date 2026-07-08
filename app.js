@@ -522,12 +522,21 @@
   }
 
   // ---------- Floating window (Document Picture-in-Picture) ----------
-  // Lets the Chrome extension pop this page's whole UI into an always-on-top
-  // window that stays visible over other apps. Exposed on window so a script
-  // injected by the extension's background worker can call it; harmless for
-  // normal browser visitors since nothing calls it unless triggered.
+  // Pops this page's whole UI into an always-on-top window that stays
+  // visible over other apps, triggered by a real click on popOutBtn (a
+  // genuine on-page user gesture — the extension's job is only to open/
+  // focus this tab; it doesn't try to trigger this itself).
 
   var pipWindow = null;
+  var popOutBtn = document.getElementById("popOutBtn");
+
+  function updatePopOutLabel() {
+    popOutBtn.innerHTML = pipWindow ? "Pop back in" : "Pop out &#8599;";
+  }
+
+  if ("documentPictureInPicture" in window) {
+    popOutBtn.classList.remove("hidden");
+  }
 
   window.__ucatTogglePip = async function () {
     if (pipWindow) {
@@ -570,10 +579,16 @@
     // Keyboard shortcuts are bound to the original document; re-bind them to
     // the pip window's document too since that's what has focus while typing.
     pipWindow.document.addEventListener("keydown", handleGlobalKeydown);
+    updatePopOutLabel();
 
     pipWindow.addEventListener("pagehide", function () {
       document.body.appendChild(pageEl);
       pipWindow = null;
+      updatePopOutLabel();
     });
   };
+
+  popOutBtn.addEventListener("click", function () {
+    window.__ucatTogglePip();
+  });
 })();
