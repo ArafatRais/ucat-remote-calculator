@@ -375,6 +375,7 @@
 
   function hideSessionPanel() {
     sessionPanel.classList.add("hidden");
+    syncPipSize();
   }
 
   function showWaitingCard(code) {
@@ -529,6 +530,7 @@
 
   var pipWindow = null;
   var popOutBtn = document.getElementById("popOutBtn");
+  var pageEl = document.querySelector(".page");
 
   function updatePopOutLabel() {
     popOutBtn.innerHTML = pipWindow ? "Pop back in" : "Pop out &#8599;";
@@ -536,6 +538,22 @@
 
   if ("documentPictureInPicture" in window) {
     popOutBtn.classList.remove("hidden");
+  }
+
+  // Measures the calculator's own natural size and resizes the floating
+  // window to match exactly, so it never shows a scrollbar or needs manual
+  // resizing. Called right after popping out, and again whenever something
+  // changes how tall the page is (session panel hiding, history opening).
+  function syncPipSize() {
+    if (!pipWindow) return;
+    var rect = pageEl.getBoundingClientRect();
+    var width = Math.ceil(rect.width) + 4;
+    var height = Math.ceil(rect.height) + 4;
+    try {
+      pipWindow.resizeTo(width, height);
+    } catch (e) {
+      // Some browsers restrict resizeTo on already-open windows; harmless if so.
+    }
   }
 
   window.__ucatTogglePip = async function () {
@@ -548,9 +566,12 @@
       return;
     }
 
-    var pageEl = document.querySelector(".page");
+    var rect = pageEl.getBoundingClientRect();
     try {
-      pipWindow = await documentPictureInPicture.requestWindow({ width: 420, height: 780 });
+      pipWindow = await documentPictureInPicture.requestWindow({
+        width: Math.ceil(rect.width) + 4,
+        height: Math.ceil(rect.height) + 4,
+      });
     } catch (err) {
       pipWindow = null;
       alert("Couldn't open the floating window:\n" + err.name + " — " + err.message);
@@ -574,12 +595,16 @@
     });
 
     pipWindow.document.body.style.margin = "0";
+    pipWindow.document.body.style.overflow = "hidden";
     pipWindow.document.body.style.background = "var(--bg, #eef1f6)";
     pipWindow.document.body.appendChild(pageEl);
     // Keyboard shortcuts are bound to the original document; re-bind them to
     // the pip window's document too since that's what has focus while typing.
     pipWindow.document.addEventListener("keydown", handleGlobalKeydown);
     updatePopOutLabel();
+    // Re-measure once the moved content has actually laid out in its new
+    // window (fonts/CSS settle a frame later), correcting any small drift.
+    requestAnimationFrame(function () { requestAnimationFrame(syncPipSize); });
 
     pipWindow.addEventListener("pagehide", function () {
       document.body.appendChild(pageEl);
@@ -591,4 +616,7 @@
   popOutBtn.addEventListener("click", function () {
     window.__ucatTogglePip();
   });
+
+  var historyDetailsEl = document.getElementById("historyDetails");
+  historyDetailsEl.addEventListener("toggle", syncPipSize);
 })();
